@@ -106,7 +106,7 @@ public class DatabaseHandler extends SQLiteOpenHelper {
 				KEY_LAT, KEY_LON, KEY_STATE, KEY_CITY, KEY_ZIP, KEY_WHOIS }, KEY_NAME + "=?",
 				new String[] { name }, null, null, null, null);
 		if (cursor != null) {
-			for (cursor.moveToFirst(); cursor.isLast(); cursor.moveToNext()) {
+			for (cursor.moveToFirst(); cursor.moveToNext();) {
 				try {
 					list.add(new Proc(cursor.getString(1), cursor.getString(2), Integer
 							.parseInt(cursor.getString(3)), cursor.getString(4), cursor
@@ -129,7 +129,7 @@ public class DatabaseHandler extends SQLiteOpenHelper {
 		Cursor cursor = db.rawQuery(selectQuery, null);
 		// looping through all rows and adding to list
 		if (cursor != null) {
-			for (cursor.moveToFirst(); cursor.isLast(); cursor.moveToNext()) {
+			for (cursor.moveToFirst(); cursor.moveToNext();) {
 				procList.add(cursor.getString(1));
 			}
 			return procList;
