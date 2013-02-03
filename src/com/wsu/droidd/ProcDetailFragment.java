@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -30,7 +31,12 @@ public class ProcDetailFragment extends Fragment {
 	/**
 	 * The dummy content this fragment is presenting.
 	 */
-	private Proc mItem;
+	private String procItemName;
+
+	/*
+	 * Database connection.
+	 */
+	DatabaseHandler dh;
 
 	/**
 	 * Mandatory empty constructor for the fragment manager to instantiate the
@@ -42,12 +48,14 @@ public class ProcDetailFragment extends Fragment {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		dh = new DatabaseHandler(this.getActivity().getBaseContext());
 
 		if (getArguments().containsKey(ARG_ITEM_ID)) {
 			// Load the dummy content specified by the fragment
 			// arguments. In a real-world scenario, use a Loader
 			// to load content from a content provider.
-			mItem = ProcListFragment.procs.get(Integer.parseInt(getArguments().getString(ARG_ITEM_ID)));
+			procItemName = ProcListFragment.procs.get(Integer.parseInt(getArguments().getString(
+					ARG_ITEM_ID)));
 
 		}
 	}
@@ -57,10 +65,13 @@ public class ProcDetailFragment extends Fragment {
 		View rootView = inflater.inflate(R.layout.fragment_proc_detail, container, false);
 
 		// Show the content as text in a TextView.
-		if (mItem != null) {
+		if (procItemName != null) {
 			String text = "Name: ";
-			text += mItem.getName();
-			text += "\nIPs: " + mItem.getIps().replace(" ", "\n");
+			text += procItemName;
+			ArrayList<Proc> procsByName = dh.getProc(procItemName);
+			for (int i = 0; i < procsByName.size(); i++) {
+				text += procsByName.get(i).toString() + "\n\n";
+			}
 			((TextView) rootView.findViewById(R.id.proc_detail)).setText(text);
 		}
 

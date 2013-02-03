@@ -3,6 +3,7 @@ package com.wsu.droidd;
 import java.util.ArrayList;
 
 import android.database.DataSetObserver;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListAdapter;
@@ -10,10 +11,28 @@ import android.widget.TextView;
 
 public class ProcAdapter implements ListAdapter {
 
-	ArrayList<Proc> list;
+	private static final String TAG = "ProcAdapter";
+	ArrayList<Proc> list = new ArrayList<Proc>();
 
-	ProcAdapter(ArrayList<Proc> l) {
-		list = l;
+	ProcAdapter() {
+		list = new ArrayList<Proc>();
+	}
+
+	/*
+	 * Only add it based on name, as of now, the adapter is only used for the
+	 * Proc lists name.
+	 */
+	ProcAdapter(ArrayList<String> l) {
+		/*
+		 * if (l.get(0) instanceof Proc) { Proc tempProc; for (Object t : l) {
+		 * tempProc = (Proc) t; list.add(tempProc); } } else {
+		 */
+		Proc tempProc = new Proc();
+		for (Object t : l) {
+			tempProc.setName(t.toString());
+			list.add(tempProc);
+		}
+		// }
 	}
 
 	@Override
@@ -48,6 +67,7 @@ public class ProcAdapter implements ListAdapter {
 		} else {
 			tv = new TextView(cv.getContext());
 		}
+		Log.d(TAG, "Name: " + list.get(pos).getName());
 		tv.setText(list.get(pos).getName());
 		return tv;
 	}

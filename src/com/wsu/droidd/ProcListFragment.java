@@ -48,7 +48,7 @@ public class ProcListFragment extends ListFragment {
 	private int mActivatedPosition = ListView.INVALID_POSITION;
 
 	// My stuff.
-	public static ArrayList<Proc> procs;
+	public static ArrayList<String> procs;
 
 	/**
 	 * A callback interface that all activities containing this fragment must

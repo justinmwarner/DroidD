@@ -12,8 +12,11 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import android.app.ActivityManager;
 import android.app.Service;
@@ -36,7 +39,8 @@ public class NetworkObserverService extends Service {
 	Handler toastHandler = new Handler();
 	Runnable toastIp = new Runnable() {
 		public void run() {
-			Toast.makeText(NetworkObserverService.this.getApplicationContext(), "Yo", Toast.LENGTH_LONG).show();
+			Toast.makeText(NetworkObserverService.this.getApplicationContext(), "Yo",
+					Toast.LENGTH_LONG).show();
 		}
 	};
 
@@ -95,69 +99,78 @@ public class NetworkObserverService extends Service {
 			// from here all commands are executed with su permissions
 			stdin.writeBytes(cmd + "\n"); // \n executes the command
 			if (isOutput) {
+				// Only the tcpdump command should get in here.
 				BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
 				String line = "";
-				// r.readLine() only completes when network activity is
-				// happening.
-				// use getCurrent() to get foreground application, and record
-				// this.
-				// readLine() will contain needed information, port and ip.
-				// map later on.
 				while ((line = r.readLine()) != null) // Process output line
 				{
+					// This loop is ran when tcpdump receives a packet.
 					int i = 0;
 					while (localIp.equals("")) {
 						if (i++ == 10) {
 							toastHandler.post(toastIp);
+							// If we can't find the current IP of the devie,
+							// shut down service.
 							this.stopSelf();
 						}
 						getLocalIpAddress();
 					}
-					String name = getCurrent();
-					String tcpdump[] = line.split(" "); // Spot 2 and 4 have
-														// ip/port. One is
-														// local.
-					String one = "", two = "";
-					String oneS[] = tcpdump[2].split("\\.");
-					String twoS[] = tcpdump[4].split("\\.");
-					for (i = 0; i < oneS.length - 1; i++) {
-						one += oneS[i].replaceAll("[^0-9]", "");
-						two += twoS[i].replaceAll("[^0-9]", "");
-						if (i != oneS.length - 2) {
-							one += ".";
-							two += ".";
+					// --------------------------------------------------
+					// In here is just processing of the tcpdump output.
+					// Output of one:
+					// 21:31:32.455845 IP 130.108.206.230.34357 >
+					// 74.125.133.108.993: Flags [P.], ack 3601985445, win 5126,
+					// options [nop,nop,TS[|tcp]>
+					String name = getCurrent(); // Gets app in foreground as
+												// that's the likely source.
+												// Obviously this should change
+												// and become more specific
+												// based on ports if it's not an
+												// official port (1-500 or w/e)
+												// using lsof
+					// Matcher match =
+					// Pattern.compile("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b.\\d{1,5}\\b").matcher(line);
+					line = line.substring(14);
+					String main = line.substring(line.indexOf("IP") + 3, line.indexOf(":"));
+					String one = main.split(">")[0].replaceAll(" ", "");
+					String two = main.split(">")[1].replaceAll(" ", "");
+					/*
+					 * String tcpdump[] = line.split(" "); // Spot 2 and 4 have
+					 * // ip/port. One is // local. String one = "", two = "";
+					 * String oneS[] = tcpdump[2].split("\\."); String twoS[] =
+					 * tcpdump[4].split("\\."); for (i = 0; i < oneS.length - 1;
+					 * i++) { one += oneS[i].replaceAll("[^0-9]", ""); two +=
+					 * twoS[i].replaceAll("[^0-9]", ""); if (i != oneS.length -
+					 * 2) { one += "."; two += "."; } } one += ":" +
+					 * oneS[oneS.length - 1]; two += ":" + twoS[twoS.length -
+					 * 1];
+					 */
+					String port = (one.contains(localIp)) ? two : one;
+					String ip = port.replaceAll("\\.[0-9]{1,5}$", "");
+					port = port.replaceAll(ip + "\\.", "");
+					// --------------------------------------------------
+					// If this is a proper ip v4 address, then add it. ip6 is
+					// not yet implemented.
+					ArrayList<Proc> temp = dh.getProc(name);
+					boolean isNewIp = true;
+					for (Proc t : temp) {
+						if (t.getIp().equals(ip)) {
+							// If the IP exists. continue. We don't want to
+							// add anything.
+							isNewIp = false;
+							break;
 						}
 					}
-					one += ":" + oneS[oneS.length - 1];
-					two += ":" + twoS[twoS.length - 1];
-					String ip = (one.substring(0, one.indexOf(":")).equals(localIp)) ? two : one;
-					// If this is a proper ip v4 address, then add it.  ip6 is not yet implemented.
-					if (InetAddress.getByAddress(ip.getBytes()) instanceof Inet4Address) {
-						// http://adam.kahtava.com/services/whois.{xml|json|jsonp|csv}?query={ipAddress}
-						Proc temp = dh.getProc(name.hashCode());
-						// Log.d(TAG, "One: " + one + " Two: " + two +
-						// " Local: " +
-						// localIp + " Chose: " + ip);
-						if (temp != null) {
-							if (!temp.getIps().contains(ip)) {
-								// Log.d(TAG, name +
-								// " is already in database.  Adding: " + ip);
-								temp.addIp(ip);
-								dh.updateProc(temp);
-							}
-						} else {
-							// Log.d(TAG, name +
-							// " does not already exist in database.  Adding: "
-							// +
-							// ip);
-							temp = new Proc(name.hashCode(), name, ip);
-							dh.addProc(temp);
-						}
-						Log.d(TAG, "Adding: " + temp.toString());
+					if (isNewIp) {
+						// If it's a new IP and we want to add it to the
+						// list, do this stuff.
+						Proc tempProc = new Proc(ip, port, name);
+						dh.addProc(tempProc);
+						Log.d(TAG, "Adding: " + tempProc.getName() + " " + tempProc.getIp());
 					}
 				}
-				return "ERROR"; // Should never be reached as long as service is
-								// ran.
+				Log.e(TAG, "Huge error");
+				return "ERROR"; // Should never be reached.
 			} else {
 				return "";
 			}
@@ -176,9 +189,11 @@ public class NetworkObserverService extends Service {
 	 */
 	public String getLocalIpAddress() {
 		try {
-			for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+			for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en
+					.hasMoreElements();) {
 				NetworkInterface intf = en.nextElement();
-				for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+				for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr
+						.hasMoreElements();) {
 					InetAddress inetAddress = enumIpAddr.nextElement();
 					if (!inetAddress.isLoopbackAddress() && (inetAddress instanceof Inet4Address)) {
 						return (localIp = inetAddress.getHostAddress().toString());
